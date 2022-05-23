@@ -11,7 +11,7 @@ namespace MetadataTool
         public static T GetArg<T>(string[] args, string argName, T defaultValue = default)
         {
             int index = Array.IndexOf(args, argName);
-            if (index > 0 && args.Length > index + 1)
+            if (index >= 0 && args.Length > index + 1)
             {
                 string rawArg = args[index + 1];
                 if (typeof(T).IsAssignableFrom(typeof(string)))
