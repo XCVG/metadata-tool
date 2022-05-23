@@ -2,7 +2,7 @@
   "profiles": {
     "metadata-tool": {
       "commandName": "Project",
-      "commandLineArgs": "-i \"E:\\junk\\mdtool test\" -mode separate"
+      "commandLineArgs": "-i \"E:\\junk\\mdtool test\" -mode guess"
     }
   }
 }

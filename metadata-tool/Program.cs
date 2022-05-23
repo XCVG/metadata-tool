@@ -28,6 +28,12 @@ namespace MetadataTool
                         separator.Separate();
                     }
                     break;
+                case "guess":
+                    {
+                        var guesser = new Guesser(args);
+                        guesser.Guess();
+                    }
+                    break;
                 default:
                     Console.WriteLine($"Unknown mode {modeArg}");
                     break;

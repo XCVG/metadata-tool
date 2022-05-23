@@ -23,5 +23,12 @@ namespace MetadataTool
             return defaultValue;
         }
 
+        private static readonly IReadOnlySet<string> VideoFileExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "mkv", "webm", "mp4", "mov"};
+
+        public static bool IsVideoFileExtension(string extension)
+        {
+            return VideoFileExtensions.Contains(extension.Trim('.'));
+        }
+
     }
 }
