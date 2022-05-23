@@ -20,8 +20,6 @@ namespace MetadataTool
             Interactive = Array.IndexOf(args, "-automate") == -1;
             BaseDirectory = (Array.IndexOf(args, "-use_exe_dir") == -1) ? Directory.GetCurrentDirectory() : Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
 
-            //TODO do something with system args like "use program folder as working directory" and "do not wait for input"
-
             switch (modeArg.ToLowerInvariant())
             {
                 case "separate":
