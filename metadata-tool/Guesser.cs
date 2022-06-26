@@ -38,7 +38,7 @@ namespace MetadataTool
 
         public void Guess()
         {
-            Console.WriteLine("Mode: Guess ID and website for files based on filename");
+            Console.WriteLine("Mode: GUESS id and website for files based on filename");
             Console.WriteLine("Input directory: " + InputFolder);
             Console.WriteLine("Output base directory: " + BaseOutputFolder);
             Console.WriteLine("Press ENTER to continue or CTRL-C to abort!");

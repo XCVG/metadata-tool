@@ -53,7 +53,7 @@ namespace MetadataTool
             source = Path.GetFullPath(source);
             destination = Path.GetFullPath(destination);
 
-            string tagString = string.Join(" ", tags.Select(t => $"-metadata {t.Key}=\"{t.Value}\""));
+            string tagString = string.Join(" ", tags.Select(t => $"-metadata {t.Key}=\"{t.Value.Replace("\"", "\\\"")}\""));
 
             using (Process p = new Process())
             {

@@ -47,7 +47,7 @@ namespace MetadataTool
 
         public void Separate()
         {
-            Console.WriteLine("Mode: Separate files with metadata from files without");
+            Console.WriteLine("Mode: SEPARATE files with metadata from files without");
             Console.WriteLine("Input directory: " + InputFolder);
             Console.WriteLine("With-Metadata output directory: " + MetadataOutputFolder);
             Console.WriteLine("No-Metadata output directory: " + NoMetadataOutputFolder);

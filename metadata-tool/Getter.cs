@@ -55,7 +55,7 @@ namespace MetadataTool
 
         public void Get()
         {
-            Console.WriteLine("Mode: Get metadata from the internet for files with known id");
+            Console.WriteLine("Mode: GET metadata from the internet for files with known id");
             Console.WriteLine("Input directory: " + InputFolder);
             Console.WriteLine("Retrieved-Metadata output directory: " + MetadataOutputFolder);
             Console.WriteLine("Missing-Metadata output directory: " + NoMetadataOutputFolder);
@@ -153,6 +153,12 @@ namespace MetadataTool
                     string url = null;
                     if(site == "youtube")
                     {
+                        if(!Regex.IsMatch(id, "[A-Za-z0-9_\\-]{11}"))
+                        {
+                            RejectFile(file, "id not in correct format for youtube");
+                            continue;
+                        }
+
                         url = $"https://www.youtube.com/watch?v={id}";
                     }
                     else
