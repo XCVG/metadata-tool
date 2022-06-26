@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 
 namespace MetadataTool
 {
@@ -17,6 +18,8 @@ namespace MetadataTool
         public void Find()
         {
             throw new NotImplementedException();
-        }
+
+            //yt-dlp ytsearch10:'lebron james' --skip-download  --dump-single-json | Out-File test.json
+        }        
     }
 }

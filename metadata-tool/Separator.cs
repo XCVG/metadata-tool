@@ -77,7 +77,7 @@ namespace MetadataTool
 
                     bool hasMetadata = false;
                     
-                    var dataString = GetFFProbeOutput(fullFilePath);
+                    var dataString = Utils.GetFFProbeOutput(fullFilePath);
                     var data = JObject.Parse(dataString);
 
                     var tagData = data["format"]["tags"];
@@ -114,35 +114,7 @@ namespace MetadataTool
                 }
 
             }
-        }
-
-        private static string GetFFProbeOutput(string filePath)
-        {
-            //ffprobe -i '' -print_format json -show_format -v quiet
-            string output = null;
-            using (Process p = new Process())
-            {
-                p.StartInfo.FileName = "ffprobe";
-                p.StartInfo.WorkingDirectory = Path.GetDirectoryName(filePath);
-                p.StartInfo.UseShellExecute = false;
-                p.StartInfo.CreateNoWindow = true;
-                p.StartInfo.RedirectStandardOutput = true;
-                p.StartInfo.Arguments = $"-i \"{filePath}\" -print_format json -show_format -v quiet";
-
-                p.Start();
-
-                p.WaitForExit(10000);
-
-                output = p.StandardOutput.ReadToEnd();
-
-                if (!p.HasExited)
-                {
-                    throw new Exception("ffprobe took too long");
-                }
-            }
-
-            return output;
-        }
+        }        
 
     }
 }

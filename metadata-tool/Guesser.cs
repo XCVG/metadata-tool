@@ -157,7 +157,7 @@ namespace MetadataTool
 
                     if (!string.IsNullOrEmpty(destinationDir))
                     {
-                        SetTagsAndCopy(file, Path.Combine(destinationDir, Path.GetFileName(file)), false, tags);
+                        Utils.SetTagsAndCopy(file, Path.Combine(destinationDir, Path.GetFileName(file)), false, tags);
                     }
                 }
                 catch (Exception ex)
@@ -168,65 +168,7 @@ namespace MetadataTool
 
         }
 
-        private static void SetTagsAndCopy(string source, string destination, bool keepOriginal, IDictionary<string, string> tags)
-        {
-            //ffmpeg -i ''  -c:v copy -c:a copy -c:s copy -map 0 -metadata  MTOOL_BESTGUESS_ID="UG6x5w6TiUI" -metadata MTOOL_BESTGUESS_SITE="youtube" ''
-
-            //special case where an mp4 and a webm exists
-            string originalExtension = "";
-            if(File.Exists(Path.Combine(Path.GetDirectoryName(source), Path.GetFileNameWithoutExtension(source) + ".webm")) && File.Exists(Path.Combine(Path.GetDirectoryName(source), Path.GetFileNameWithoutExtension(source) + ".mp4")))
-            {
-                originalExtension = Path.GetExtension(source);
-            }
-
-            destination = Path.Combine(Path.GetDirectoryName(destination), Path.GetFileNameWithoutExtension(destination) + originalExtension + ".mkv");
-            if(File.Exists(destination))
-            {
-                Path.Combine(Path.GetDirectoryName(destination), Path.GetFileNameWithoutExtension(destination) + " (1)" + originalExtension + ".mkv");
-            }
-
-            source = Path.GetFullPath(source);
-            destination = Path.GetFullPath(destination);
-
-            string tagString = string.Join(" ", tags.Select(t => $"-metadata {t.Key}=\"{t.Value}\""));
-
-            using (Process p = new Process())
-            {
-                p.StartInfo.FileName = "ffmpeg";
-                p.StartInfo.WorkingDirectory = Path.GetDirectoryName(source);
-                p.StartInfo.UseShellExecute = false;
-                p.StartInfo.CreateNoWindow = true;
-                //p.StartInfo.RedirectStandardOutput = true;
-                p.StartInfo.Arguments = $"-i \"{source}\" -c:v copy -c:a copy -c:s copy -map 0 {tagString} \"{destination}\"";
-
-                p.Start();
-
-                p.WaitForExit(30000);
-
-                if (!p.HasExited)
-                {
-                    throw new Exception("ffmpeg took too long");
-                }
-            }
-
-            Thread.Sleep(100); //make sure FS changes are committed
-                
-            if(!File.Exists(destination))
-            {
-                throw new FileNotFoundException("ffmpeg failed to create file");
-            }
-
-            var modifiedDate = File.GetLastWriteTime(source);
-            File.SetLastWriteTime(destination, modifiedDate);
-
-            if(!keepOriginal)
-            {
-                File.Delete(source);
-            }
-
-            Thread.Sleep(100); //make sure FS changes are committed
-
-        }
+        
 
     }
 }
