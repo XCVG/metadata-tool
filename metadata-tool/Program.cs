@@ -34,6 +34,18 @@ namespace MetadataTool
                         guesser.Guess();
                     }
                     break;
+                case "find":
+                    {
+                        var finder = new Finder(args);
+                        finder.Find();
+                    }
+                    break;
+                case "get":
+                    {
+                        var getter = new Getter(args);
+                        getter.Get();
+                    }
+                    break;
                 default:
                     Console.WriteLine($"Unknown mode {modeArg}");
                     break;

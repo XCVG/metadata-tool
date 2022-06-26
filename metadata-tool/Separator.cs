@@ -53,7 +53,8 @@ namespace MetadataTool
             Console.WriteLine("No-Metadata output directory: " + NoMetadataOutputFolder);
             Console.WriteLine("Press ENTER to continue or CTRL-C to abort!");
 
-            Console.ReadLine();
+            if(Program.Interactive)
+                Console.ReadLine();
 
             if(!string.IsNullOrEmpty(MetadataOutputFolder))
             {

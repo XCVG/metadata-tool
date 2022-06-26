@@ -43,7 +43,8 @@ namespace MetadataTool
             Console.WriteLine("Output base directory: " + BaseOutputFolder);
             Console.WriteLine("Press ENTER to continue or CTRL-C to abort!");
 
-            Console.ReadLine();
+            if (Program.Interactive)
+                Console.ReadLine();
 
             string youtubeDir = Path.Combine(BaseOutputFolder, "_youtube");
             Directory.CreateDirectory(youtubeDir);
