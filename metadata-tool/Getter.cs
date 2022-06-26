@@ -121,7 +121,11 @@ namespace MetadataTool
                     var tagData = data["format"]["tags"];
                     if (tagData != null && tagData.Type == JTokenType.Object)
                     {
-                        if (tagData["PURL"] != null && tagData["PURL"].Type == JTokenType.String)
+                        if (tagData["MTOOL_ID"] != null && tagData["MTOOL_ID"].Type == JTokenType.String)
+                        {
+                            id = tagData["MTOOL_ID"].ToString();
+                        }
+                        else if (tagData["PURL"] != null && tagData["PURL"].Type == JTokenType.String)
                         {
                             string purl = tagData["PURL"].ToString();
                             if (purl.Contains("youtube", StringComparison.OrdinalIgnoreCase) || purl.Contains("youtu.be", StringComparison.OrdinalIgnoreCase))
@@ -129,7 +133,7 @@ namespace MetadataTool
                                 site = "youtube";
                                 string pattern = "watch\\?v=([A-Za-z0-9_\\-]+)";
                                 var match = Regex.Match(purl, pattern);
-                                if(match.Success)
+                                if (match.Success)
                                 {
                                     id = match.Groups[1].Value;
                                 }
@@ -139,7 +143,7 @@ namespace MetadataTool
                         //TODO other sites
                         else
                         {
-                            if(tagData["MTOOL_BESTGUESS_SITE"] != null && tagData["MTOOL_BESTGUESS_SITE"].Type == JTokenType.String)
+                            if (tagData["MTOOL_BESTGUESS_SITE"] != null && tagData["MTOOL_BESTGUESS_SITE"].Type == JTokenType.String)
                             {
                                 site = tagData["MTOOL_BESTGUESS_SITE"].ToString();
                             }
@@ -326,33 +330,16 @@ namespace MetadataTool
 
         private RetrievedMetadata GetMetadataImgur(FileMetadata data)
         {
-            string htmlData = null;
-            string url = $"https://imgur.com/gallery/{data.Id}";
-
-            //TODO also try url of the format https://imgur.com/{id}
-            Task.Run(async () =>
+            string metadataString = DownloadMetadataImgur($"https://imgur.com/gallery/{data.Id}");
+            if(metadataString == null)
             {
-                using (var httpClient = new HttpClient())
-                {
-                    using (var request = new HttpRequestMessage(new HttpMethod("GET"), url))
-                    {
-                        var response = await httpClient.SendAsync(request);
-                        htmlData = await response.Content.ReadAsStringAsync();
-                    }
-                }
-            }).Wait();
-            
-
-            string matchPattern = "<script>[^\"]+\"{.*}\"<\\/script>";
-            var match = Regex.Match(htmlData, matchPattern);
-            if(!match.Success)
-            {
-                throw new MetadataDownloadException("can't find json data in response");
+                //also try url of the format https://imgur.com/{id}
+                metadataString = DownloadMetadataImgur($"https://imgur.com/{data.Id}");
             }
-
-            int startIndex = match.Value.IndexOf('{');
-            int endIndex = match.Value.LastIndexOf('}') - startIndex + 1;
-            string metadataString = match.Value.Substring(startIndex, endIndex).Replace("\\\"", "\"").Replace("\\\\", "\\");
+            if (metadataString == null)
+            {
+                throw new MetadataDownloadException("can't find json data in response (probably missing)");
+            }
 
             JObject metadataObject = JObject.Parse(metadataString);
             
@@ -456,6 +443,39 @@ namespace MetadataTool
             }
 
             return output;
+        }
+
+        private static string DownloadMetadataImgur(string url)
+        {
+            string htmlData = null;
+
+            Task.Run(async () =>
+            {
+                using (var httpClient = new HttpClient())
+                {
+                    using (var request = new HttpRequestMessage(new HttpMethod("GET"), url))
+                    {
+                        var response = await httpClient.SendAsync(request);
+                        htmlData = await response.Content.ReadAsStringAsync();
+                    }
+                }
+            }).Wait();
+
+            if (string.IsNullOrWhiteSpace(htmlData))
+                return null;
+
+            string matchPattern = "<script>[^\"]+\"{.*}\"<\\/script>";
+            var match = Regex.Match(htmlData, matchPattern);
+            if (!match.Success)
+            {
+                return null;
+            }
+
+            int startIndex = match.Value.IndexOf('{');
+            int endIndex = match.Value.LastIndexOf('}') - startIndex + 1;
+            string metadataString = match.Value.Substring(startIndex, endIndex).Replace("\\\"", "\"").Replace("\\\\", "\\");
+
+            return metadataString;
         }
 
         private class FileMetadata
