@@ -153,7 +153,7 @@ namespace MetadataTool
                     string url = null;
                     if(site == "youtube")
                     {
-                        if(!Regex.IsMatch(id, "[A-Za-z0-9_\\-]{11}"))
+                        if(!Regex.IsMatch(id, "^[A-Za-z0-9_\\-]{11}$"))
                         {
                             RejectFile(file, "id not in correct format for youtube");
                             continue;
