@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -24,6 +26,10 @@ namespace MetadataTool
         private string NoMetadataOutputFolder;
 
         private string TempFolder;
+
+        private string SiteOverride;
+        private bool RenameFile;
+        private bool UseFilenameAsId;
 
         public Getter(string[] args)
         {
@@ -51,6 +57,10 @@ namespace MetadataTool
             }
 
             TempFolder = Path.Combine(InputFolder, "_TEMP");
+
+            SiteOverride = Utils.GetArg<string>(args, "-site");
+            RenameFile = args.Contains("-rename");
+            UseFilenameAsId = args.Contains("-use-filename");
         }
 
         public void Get()
@@ -59,6 +69,9 @@ namespace MetadataTool
             Console.WriteLine("Input directory: " + InputFolder);
             Console.WriteLine("Retrieved-Metadata output directory: " + MetadataOutputFolder);
             Console.WriteLine("Missing-Metadata output directory: " + NoMetadataOutputFolder);
+            Console.WriteLine("Site override: " + (SiteOverride ?? "none"));
+            Console.WriteLine("Use filename as ID? " + (UseFilenameAsId ? "yes" : "no"));
+            Console.WriteLine("Rename files? " + (RenameFile ? "yes" : "no"));
             Console.WriteLine("Press ENTER to continue or CTRL-C to abort!");
 
             if (Program.Interactive)
@@ -149,6 +162,12 @@ namespace MetadataTool
                             duration = d;
                     }
 
+                    if (!string.IsNullOrEmpty(SiteOverride))
+                        site = SiteOverride;
+
+                    if (string.IsNullOrEmpty(id) && UseFilenameAsId)
+                        id = Path.GetFileNameWithoutExtension(file);
+
                     //if site or id missing, treat as no metadata
                     if(site == null || id == null)
                     {
@@ -156,88 +175,66 @@ namespace MetadataTool
                         continue;
                     }
 
-                    string url = null;
-                    if(site == "youtube")
-                    {
-                        if(!Regex.IsMatch(id, "^[A-Za-z0-9_\\-]{11}$"))
-                        {
-                            RejectFile(file, "id not in correct format for youtube");
-                            continue;
-                        }
-
-                        url = $"https://www.youtube.com/watch?v={id}";
-                    }
-                    else
-                    {
-                        throw new NotImplementedException("other sites not implemented yet");
-                    }
-
-                    JObject metadataObject = null;
-                    string metadataString = DownloadMetadata(url);
-
+                    //actually get metadata (delegated to handlers)
+                    RetrievedMetadata retrievedMetadata = null;
                     try
                     {
-                        metadataObject = JObject.Parse(metadataString);
+                        FileMetadata fileMetadata = new FileMetadata()
+                        {
+                            Id = id,
+                            Site = site,
+                            Duration = duration,
+                            Date = uploadDate
+                        };                        
+
+                        if (site == "youtube")
+                        {
+                            if (!Regex.IsMatch(id, "^[A-Za-z0-9_\\-]{11}$"))
+                            {
+                                RejectFile(file, "id not in correct format for youtube");
+                                continue;
+                            }
+
+                            retrievedMetadata = GetMetadataYoutube(fileMetadata);
+                        }
+                        else if(site == "imgur")
+                        {
+                            retrievedMetadata = GetMetadataImgur(fileMetadata);
+                        }
+                        else
+                        {
+                            throw new NotImplementedException("other sites not implemented yet");
+                        }
                     }
-                    catch(Exception e)
+                    catch(MetadataDownloadException mde)
                     {
-                        RejectFile(file, "couldn't parse metadata json");
+                        RejectFile(file, mde.Message);
                         continue;
                     }
 
-                    //upload date and duration sanity checks if available
-                    if(uploadDate != null)
-                    {
-                        if (metadataObject["upload_date"] != null && metadataObject["upload_date"].Type == JTokenType.String)
-                        {
-                            DateTime mdUploadDate = DateTime.ParseExact(tagData["DATE"].ToString(), "yyyyMMdd", CultureInfo.InvariantCulture);
-                            if (mdUploadDate.Date != uploadDate.Value.Date)
-                            {
-                                RejectFile(file, "failed upload date check");
-                                continue;
-                            }                                
-                        }
-                    }
-
-                    if(duration != null)
-                    {
-                        if (metadataObject["duration"] != null)
-                        {
-                            if(double.TryParse(metadataObject["duration"].ToString(), out var mdDuration))
-                            {
-                                if(Math.Abs(mdDuration - duration.Value) > DURATION_EPSILON)
-                                {
-                                    RejectFile(file, "failed duration check");
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-
-                    //prepare and set metadata
-                    var tags = new Dictionary<string, string>()
-                    {
-                        { "title", metadataObject["title"].ToString() },
-                        { "COMMENT", metadataObject["description"].ToString() },
-                        { "ARTIST", metadataObject["uploader"].ToString() },
-                        { "DATE", metadataObject["upload_date"].ToString() },
-                        { "DESCRIPTION", metadataObject["description"].ToString() },
-                        { "PURL", metadataObject["webpage_url"].ToString() },
-                        { "CHANNEL_ID", metadataObject["channel_id"].ToString() },
-                        { "MTOOL_ID", id},
-                        { "MTOOL_SITE", site }
-                    };
-
                     string destinationPath = null;
+                    string newName = null;
+
+                    if(RenameFile)
+                    {
+                        newName = $"{retrievedMetadata.Title} - {id}{Path.GetExtension(file)}";
+                    }
+
                     if(!string.IsNullOrEmpty(MetadataOutputFolder))
                     {
-                        string targetPath = Path.Combine(MetadataOutputFolder, Path.GetFileName(file));
-                        destinationPath = Utils.SetTagsAndCopy(file, targetPath, false, tags);
+                        string targetPath = Path.Combine(MetadataOutputFolder, newName ?? Path.GetFileName(file));
+                        destinationPath = Utils.SetTagsAndCopy(file, targetPath, false, retrievedMetadata.Tags);
+                        Console.WriteLine($"{file} -> {targetPath} [OK]");
+                    }
+                    else if (newName != null)
+                    {
+                        string targetPath = Path.Combine(InputFolder, newName);
+                        destinationPath = Utils.SetTagsAndCopy(file, targetPath, false, retrievedMetadata.Tags);
                         Console.WriteLine($"{file} -> {targetPath} [OK]");
                     }
                     else
                     {
-                        destinationPath = Utils.SetTagsAndCopy(file, Path.Combine(TempFolder, Path.GetFileName(file)), false, tags);
+                        destinationPath = Utils.SetTagsAndCopy(file, Path.Combine(TempFolder, Path.GetFileName(file)), false, retrievedMetadata.Tags);
                         Thread.Sleep(100);
                         string newDestPath = Path.GetFileName(destinationPath);
                         File.Move(destinationPath, Path.Combine(InputFolder, newDestPath));
@@ -246,9 +243,9 @@ namespace MetadataTool
                         Console.WriteLine($"{file} kept in place [OK]");
                     }
 
-                    if(DateTime.TryParseExact(metadataObject["upload_date"].ToString(), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var uDate))
+                    if(retrievedMetadata.UploadDate.HasValue)
                     {
-                        File.SetLastWriteTime(destinationPath, uDate);
+                        File.SetLastWriteTime(destinationPath, retrievedMetadata.UploadDate.Value);
                     }
 
                 }
@@ -257,6 +254,157 @@ namespace MetadataTool
                     Console.Error.WriteLine($"Failed to handle file {file} with {ex.GetType().Name}: {ex.Message}");
                 }
             }
+        }
+
+        private RetrievedMetadata GetMetadataYoutube(FileMetadata data)
+        {
+            Dictionary<string, string> tags = new Dictionary<string, string>();
+
+            string url = $"https://www.youtube.com/watch?v={data.Id}";
+
+            JObject metadataObject = null;
+            string metadataString = DownloadMetadataDlp(url);
+
+            try
+            {
+                metadataObject = JObject.Parse(metadataString);
+            }
+            catch (Exception e)
+            {
+                throw new MetadataDownloadException("couldn't parse metadata json");
+            }
+
+            DateTime uploadDate;
+            uploadDate = DateTime.ParseExact(metadataObject["upload_date"].ToString(), "yyyyMMdd", CultureInfo.InvariantCulture);
+
+            //upload date and duration sanity checks if available
+            if (data.Date != null)
+            {
+                if(uploadDate.Date != data.Date)
+                {
+                    throw new MetadataDownloadException("failed upload date check");
+                }
+            }
+
+            if (data.Duration != null)
+            {
+                if (metadataObject["duration"] != null)
+                {
+                    if (double.TryParse(metadataObject["duration"].ToString(), out var mdDuration))
+                    {
+                        if (Math.Abs(mdDuration - data.Duration.Value) > DURATION_EPSILON)
+                        {
+                            throw new MetadataDownloadException("failed duration check");
+                        }
+                    }
+                }
+            }
+
+            //prepare and set metadata
+            tags = new Dictionary<string, string>()
+            {
+                { "title", metadataObject["title"].ToString() },
+                { "COMMENT", metadataObject["description"].ToString() },
+                { "ARTIST", metadataObject["uploader"].ToString() },
+                { "DATE", metadataObject["upload_date"].ToString() },
+                { "DESCRIPTION", metadataObject["description"].ToString() },
+                { "PURL", metadataObject["webpage_url"].ToString() },
+                { "CHANNEL_ID", metadataObject["channel_id"].ToString() },
+                { "MTOOL_ID", data.Id},
+                { "MTOOL_SITE", data.Site }
+            };
+
+            return new RetrievedMetadata()
+            {
+                MetadataObject = metadataObject,
+                MetadataString = metadataString,
+                UploadDate = uploadDate,
+                Tags = tags,
+                Title = metadataObject["title"].ToString()
+            };
+        }
+
+        private RetrievedMetadata GetMetadataImgur(FileMetadata data)
+        {
+            string htmlData = null;
+            string url = $"https://imgur.com/gallery/{data.Id}";
+
+            //TODO also try url of the format https://imgur.com/{id}
+            Task.Run(async () =>
+            {
+                using (var httpClient = new HttpClient())
+                {
+                    using (var request = new HttpRequestMessage(new HttpMethod("GET"), url))
+                    {
+                        var response = await httpClient.SendAsync(request);
+                        htmlData = await response.Content.ReadAsStringAsync();
+                    }
+                }
+            }).Wait();
+            
+
+            string matchPattern = "<script>[^\"]+\"{.*}\"<\\/script>";
+            var match = Regex.Match(htmlData, matchPattern);
+            if(!match.Success)
+            {
+                throw new MetadataDownloadException("can't find json data in response");
+            }
+
+            int startIndex = match.Value.IndexOf('{');
+            int endIndex = match.Value.LastIndexOf('}') - startIndex + 1;
+            string metadataString = match.Value.Substring(startIndex, endIndex).Replace("\\\"", "\"").Replace("\\\\", "\\");
+
+            JObject metadataObject = JObject.Parse(metadataString);
+            
+            DateTime creationDate = DateTime.Parse(metadataObject["created_at"].ToString());
+
+            //sanity checks
+            if(data.Date.HasValue)
+            {
+                if(Math.Abs((creationDate - data.Date.Value).TotalHours) > 24)
+                {
+                    throw new MetadataDownloadException("failed creation date check");
+                }
+            }
+
+            if (metadataObject["media"][0] != null && 
+                metadataObject["media"][0] != null &&
+                metadataObject["media"][0]["type"] != null &&
+                metadataObject["media"][0]["type"].ToString() != "image" &&
+                metadataObject["media"][0]["metadata"] != null && 
+                metadataObject["media"][0]["metadata"]["duration"] != null)
+            {
+                if (double.TryParse(metadataObject["media"][0]["metadata"]["duration"].ToString(), out var mdDuration))
+                {
+                    if (Math.Abs(mdDuration - data.Duration.Value) > DURATION_EPSILON)
+                    {
+                        throw new MetadataDownloadException("failed duration check");
+                    }
+                }
+            }
+
+            var tags = new Dictionary<string, string>()
+            {
+                { "title", metadataObject["title"].ToString() },
+                { "COMMENT", metadataObject["description"].ToString() },
+                { "ARTIST", metadataObject["account"]["username"].ToString() },
+                { "DATE", creationDate.Date.ToString("yyyyMMdd") },
+                { "DESCRIPTION", metadataObject["description"].ToString() },
+                { "PURL", metadataObject["url"].ToString() },
+                { "UPLOADER_ID", metadataObject["account_id"].ToString() },
+                { "MTOOL_ID", data.Id},
+                { "MTOOL_SITE", data.Site },
+                { "MTOOL_RAW_DATE", metadataObject["created_at"].ToString() }
+            };
+
+            return new RetrievedMetadata()
+            {
+                MetadataObject = metadataObject,
+                MetadataString = metadataString,
+                UploadDate = creationDate,
+                Tags = tags,
+                Title = metadataObject["title"].ToString()
+            };
         }
 
         private void RejectFile(string file, string message)
@@ -275,7 +423,7 @@ namespace MetadataTool
             }
         }
 
-        private static string DownloadMetadata(string url)
+        private static string DownloadMetadataDlp(string url)
         {
             string output = null;
             using (Process p = new Process())
@@ -308,6 +456,28 @@ namespace MetadataTool
             }
 
             return output;
+        }
+
+        private class FileMetadata
+        {
+            public string Site;
+            public string Id;
+            public DateTime? Date;
+            public double? Duration;
+        }
+
+        private class RetrievedMetadata
+        {
+            public string MetadataString;
+            public JObject MetadataObject;
+            public Dictionary<string, string> Tags;
+            public string Title;
+            public DateTime? UploadDate;
+        }
+
+        private class MetadataDownloadException : Exception
+        {
+            public MetadataDownloadException(string message) : base(message) { }
         }
 
     }
