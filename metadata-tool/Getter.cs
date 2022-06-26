@@ -92,6 +92,12 @@ namespace MetadataTool
                     var dataString = Utils.GetFFProbeOutput(fullFilePath);
                     var data = JObject.Parse(dataString);
 
+                    if(data["format"] == null || data["format"]["tags"] == null)
+                    {
+                        RejectFile(file, "invalid ffprobe result");
+                        continue;
+                    }
+
                     //these are needed
                     string site = null, id = null;
 
