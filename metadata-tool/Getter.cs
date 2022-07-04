@@ -221,7 +221,10 @@ namespace MetadataTool
 
                     if(RenameFile)
                     {
-                        newName = $"{retrievedMetadata.Title} - {id}{Path.GetExtension(file)}";
+                        string cleanTitle = string.Join("_", retrievedMetadata.Title.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+                        if (cleanTitle.Length > 128)
+                            cleanTitle = cleanTitle.Substring(0, 128);
+                        newName = $"{cleanTitle} - {id}{Path.GetExtension(file)}";
                     }
 
                     if(!string.IsNullOrEmpty(MetadataOutputFolder))
