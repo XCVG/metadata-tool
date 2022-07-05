@@ -205,6 +205,14 @@ namespace MetadataTool
                         {
                             retrievedMetadata = GetMetadataImgur(fileMetadata);
                         }
+                        else if (site == "reddit")
+                        {
+                            retrievedMetadata = GetMetadataReddit(fileMetadata);
+                        }
+                        else if (site == "twitter")
+                        {
+                            retrievedMetadata = GetMetadataTwitter(fileMetadata);
+                        }
                         else
                         {
                             throw new NotImplementedException("other sites not implemented yet");
@@ -225,6 +233,7 @@ namespace MetadataTool
                         if (cleanTitle.Length > 128)
                             cleanTitle = cleanTitle.Substring(0, 128);
                         newName = $"{cleanTitle} - {id}{Path.GetExtension(file)}";
+                        retrievedMetadata.Tags.Add("MTOOL_ORIGINAL_FILENAME", Path.GetFileName(file));
                     }
 
                     if(!string.IsNullOrEmpty(MetadataOutputFolder))
@@ -263,6 +272,166 @@ namespace MetadataTool
             }
         }
 
+        private RetrievedMetadata GetMetadataReddit(FileMetadata data)
+        {
+            Dictionary<string, string> tags = new Dictionary<string, string>();
+
+            string url = $"https://v.redd.it/{data.Id}";
+
+            JObject metadataObject = null;
+            string metadataString = DownloadMetadataDlp(url);
+
+            if(string.IsNullOrEmpty(metadataString))
+            {
+                throw new MetadataDownloadException("metadata string was empty (probably 404)");
+            }
+
+            try
+            {
+                metadataObject = JObject.Parse(metadataString);
+            }
+            catch (Exception e)
+            {
+                throw new MetadataDownloadException("couldn't parse metadata json");
+            }
+
+            DateTime uploadDate;
+            uploadDate = DateTime.ParseExact(metadataObject["upload_date"].ToString(), "yyyyMMdd", CultureInfo.InvariantCulture);
+
+            //upload date and duration sanity checks if available
+            if (data.Date != null)
+            {
+                if (uploadDate.Date != data.Date)
+                {
+                    throw new MetadataDownloadException("failed upload date check");
+                }
+            }
+
+            if (data.Duration != null)
+            {
+                if (metadataObject["duration"] != null)
+                {
+                    if (double.TryParse(metadataObject["duration"].ToString(), out var mdDuration))
+                    {
+                        if (Math.Abs(mdDuration - data.Duration.Value) > DURATION_EPSILON)
+                        {
+                            throw new MetadataDownloadException("failed duration check");
+                        }
+                    }
+                }
+            }
+
+            //prepare and set metadata
+            tags = new Dictionary<string, string>()
+            {
+                { "title", metadataObject["title"].ToString() },
+                { "ARTIST", metadataObject["uploader"].ToString() },
+                { "DATE", metadataObject["upload_date"].ToString() },
+                { "ORIGINAL_URL", metadataObject["original_url"].ToString() },
+                { "DISPLAY_ID", metadataObject["display_id"].ToString() },
+                { "FULL_TITLE", metadataObject["fulltitle"].ToString() },
+                { "PURL", metadataObject["webpage_url"].ToString() },
+                { "TIMESTAMP", metadataObject["timestamp"].ToString() },
+                { "MTOOL_ID", data.Id},
+                { "MTOOL_SITE", data.Site }
+            };
+
+            if (metadataObject["description"] != null)
+            {
+                tags.Add("DESCRIPTION", metadataObject["description"].ToString());
+            }
+            else
+            {
+                tags.Add("DESCRIPTION", metadataObject["fulltitle"].ToString());
+            }
+
+            return new RetrievedMetadata()
+            {
+                MetadataObject = metadataObject,
+                MetadataString = metadataString,
+                UploadDate = uploadDate,
+                Tags = tags,
+                Title = metadataObject["title"].ToString()
+            };
+        }
+
+        private RetrievedMetadata GetMetadataTwitter(FileMetadata data)
+        {
+            Dictionary<string, string> tags = new Dictionary<string, string>();
+
+            string url = $"https://twitter.com/anyuser/status/{data.Id}";
+
+            JObject metadataObject = null;
+            string metadataString = DownloadMetadataDlp(url);
+
+            if (string.IsNullOrEmpty(metadataString))
+            {
+                throw new MetadataDownloadException("metadata string was empty (probably 404)");
+            }
+
+            try
+            {
+                metadataObject = JObject.Parse(metadataString);
+            }
+            catch (Exception e)
+            {
+                throw new MetadataDownloadException("couldn't parse metadata json");
+            }
+
+            DateTime uploadDate;
+            uploadDate = DateTime.ParseExact(metadataObject["upload_date"].ToString(), "yyyyMMdd", CultureInfo.InvariantCulture);
+
+            //upload date and duration sanity checks if available
+            if (data.Date != null)
+            {
+                if (uploadDate.Date != data.Date)
+                {
+                    throw new MetadataDownloadException("failed upload date check");
+                }
+            }
+
+            if (data.Duration != null)
+            {
+                if (metadataObject["duration"] != null)
+                {
+                    if (double.TryParse(metadataObject["duration"].ToString(), out var mdDuration))
+                    {
+                        if (Math.Abs(mdDuration - data.Duration.Value) > DURATION_EPSILON)
+                        {
+                            throw new MetadataDownloadException("failed duration check");
+                        }
+                    }
+                }
+            }
+
+            //prepare and set metadata
+            tags = new Dictionary<string, string>()
+            {
+                { "title", metadataObject["title"].ToString() },
+                { "ARTIST", metadataObject["uploader"].ToString() },
+                { "DESCRIPTION", metadataObject["description"].ToString() },
+                { "DATE", metadataObject["upload_date"].ToString() },
+                { "ORIGINAL_URL", metadataObject["original_url"].ToString() },
+                { "DISPLAY_ID", metadataObject["display_id"].ToString() },
+                { "FULL_TITLE", metadataObject["fulltitle"].ToString() },
+                { "CHANNEL_ID", metadataObject["uploader_id"].ToString() },
+                { "CHANNEL_URL", metadataObject["uploader_url"].ToString() },
+                { "PURL", metadataObject["webpage_url"].ToString() },
+                { "TIMESTAMP", metadataObject["timestamp"].ToString() },
+                { "MTOOL_ID", data.Id},
+                { "MTOOL_SITE", data.Site }
+            };
+
+            return new RetrievedMetadata()
+            {
+                MetadataObject = metadataObject,
+                MetadataString = metadataString,
+                UploadDate = uploadDate,
+                Tags = tags,
+                Title = metadataObject["title"].ToString()
+            };
+        }
+
         private RetrievedMetadata GetMetadataYoutube(FileMetadata data)
         {
             Dictionary<string, string> tags = new Dictionary<string, string>();
@@ -271,6 +440,11 @@ namespace MetadataTool
 
             JObject metadataObject = null;
             string metadataString = DownloadMetadataDlp(url);
+
+            if (string.IsNullOrEmpty(metadataString))
+            {
+                throw new MetadataDownloadException("metadata string was empty (probably 404)");
+            }
 
             try
             {
