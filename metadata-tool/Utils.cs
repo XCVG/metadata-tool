@@ -47,7 +47,7 @@ namespace MetadataTool
             destination = Path.Combine(Path.GetDirectoryName(destination), Path.GetFileNameWithoutExtension(destination) + originalExtension + ".mkv");
             if (File.Exists(destination))
             {
-                Path.Combine(Path.GetDirectoryName(destination), Path.GetFileNameWithoutExtension(destination) + " (1)" + originalExtension + ".mkv");
+                destination = Path.Combine(Path.GetDirectoryName(destination), Path.GetFileNameWithoutExtension(destination) + " (1)" + originalExtension + ".mkv");
             }
 
             source = Path.GetFullPath(source);
