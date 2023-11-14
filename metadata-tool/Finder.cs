@@ -96,9 +96,14 @@ namespace MetadataTool
 
             Thread.Sleep(1000); //anti-glitching
 
+            Stopwatch sw = Stopwatch.StartNew();
+            int foundCount = 0, totalCount = 0, missingCount = 0, errorCount = 0;
+
             var files = Directory.EnumerateFiles(InputFolder);
             foreach (var file in files)
             {
+                totalCount++;
+
                 try
                 {
                     if (!Utils.IsVideoFileExtension(Path.GetExtension(file)))
@@ -196,6 +201,8 @@ namespace MetadataTool
 
                         Console.WriteLine($"{file} -> {nfTargetPath} [NO MATCH]");
 
+                        missingCount++;
+
                         continue;
                     }
 
@@ -228,14 +235,20 @@ namespace MetadataTool
                     }
 
                     Console.WriteLine($"{file} -> {targetPath} ({id}) [OK]");
+                    foundCount++;
 
                     Thread.Sleep(random.Next(5000));
                 }
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"Failed to handle file {file} with {ex.GetType().Name}: {ex.Message}");
+                    errorCount++;
                 }
             }
+
+            sw.Stop();
+
+            Console.WriteLine($"Processed {totalCount} files in {sw.Elapsed.Hours}h {sw.Elapsed.Minutes}m {sw.Elapsed.Seconds}s ({foundCount} found, {missingCount} missing, {errorCount} errors)");
         }
 
         private static string RemoveSpecialCharactersCustom(string str)
