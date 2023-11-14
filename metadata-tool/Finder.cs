@@ -60,6 +60,8 @@ namespace MetadataTool
 
         public void Find()
         {
+            Random random = new Random();
+
             Console.WriteLine("Mode: FIND id and metadata for files without an id even in the filename");
             Console.WriteLine("Input directory: " + InputFolder);
             Console.WriteLine("Found output directory: " + FoundOutputFolder);
@@ -226,6 +228,8 @@ namespace MetadataTool
                     }
 
                     Console.WriteLine($"{file} -> {targetPath} ({id}) [OK]");
+
+                    Thread.Sleep(random.Next(5000));
                 }
                 catch (Exception ex)
                 {
